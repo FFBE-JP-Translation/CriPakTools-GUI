@@ -19,7 +19,7 @@ namespace LibCPK
         public CPK()
         {
             isUtfEncrypted = false;
-            
+            isNamelessPack = false;
         }
 
         public bool ReadCPK(string sPath, Encoding encoding = null)
@@ -313,6 +313,8 @@ namespace LibCPK
 
         public bool ReadITOC(EndianReader br, ulong startoffset, ulong ContentOffset, ushort Align)
         {
+            isNamelessPack = true;
+
             br.BaseStream.Seek((long)startoffset, SeekOrigin.Begin);
 
             if (Tools.ReadCString(br, 4) != "ITOC")
@@ -460,7 +462,7 @@ namespace LibCPK
                 temp.TOCName = "ITOC";
 
                 temp.DirName = null;
-                temp.FileName = id.ToString() + ".bin" ;
+                temp.FileName = id.ToString("D4");
 
                 temp.FileSize = value;
                 temp.FileSizePos = SizePosTable[id];
@@ -1083,6 +1085,7 @@ namespace LibCPK
         }
 
         public bool isUtfEncrypted { get; set; }
+        public bool isNamelessPack { get; set; }
         public int unk1 { get; set; }
         public long utf_size { get; set; }
         public byte[] utf_packet { get; set; }

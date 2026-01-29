@@ -29,8 +29,54 @@ namespace LibCPK
             this.onCompleteChanged = onCompleteEvent;
         }
 
+        private string RemoveExtensionFromPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return path;
+
+            if (path.StartsWith("/"))
+            {
+                int lastSlash = path.LastIndexOf('/');
+                int lastDot = path.LastIndexOf('.');
+
+                if (lastDot > lastSlash)
+                {
+                    return path.Substring(0, lastDot);
+                }
+                return path;
+            }
+
+            int lastDotIndex = path.LastIndexOf('.');
+            int lastSlashIndex = Math.Max(path.LastIndexOf('/'), path.LastIndexOf('\\'));
+
+            if (lastDotIndex > lastSlashIndex)
+            {
+                return path.Substring(0, lastDotIndex);
+            }
+
+            return path;
+        }
+
         public void Patch(string outputFilePath, bool bForceCompress, Dictionary<string, string> batch_file_list)
         {
+            Dictionary<string, string> fileMap = batch_file_list;
+
+            // Build nameless map
+            if (cpk.isNamelessPack)
+            {
+                fileMap = new Dictionary<string, string>();
+                foreach (var kvp in batch_file_list)
+                {
+                    string key = kvp.Key;
+                    string value = kvp.Value;
+
+                    string keyWithoutExt = RemoveExtensionFromPath(key);
+                    fileMap[keyWithoutExt] = value;
+
+                    Debug.Print($"Nameless map: '{key}' -> '{keyWithoutExt}' -> '{value}'");
+                }
+            }
+
             string msg;
             BinaryReader oldFile = new BinaryReader(File.OpenRead(this.cpkContentName));
             string outputName = outputFilePath;
@@ -77,7 +123,7 @@ namespace LibCPK
                         
                         Debug.Print("Got File:" + currentName.ToString());
 
-                        if (!batch_file_list.Keys.Contains(currentName.ToString()))
+                        if (!fileMap.Keys.Contains(currentName.ToString()))
                         //如果不在表中，复制原始数据
                         {
                             oldFile.BaseStream.Seek((long)entries[i].FileOffset, SeekOrigin.Begin);
@@ -106,7 +152,7 @@ namespace LibCPK
                         }
                         else
                         {
-                            string replace_with = batch_file_list[currentName.ToString()];
+                            string replace_with = fileMap[currentName.ToString()];
                             //Got patch file name
 
                             onMsgUpdateChanged?.Invoke(string.Format("Patching: {0}", currentName.ToString()));
