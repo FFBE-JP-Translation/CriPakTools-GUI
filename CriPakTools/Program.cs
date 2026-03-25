@@ -13,7 +13,7 @@ namespace CriPakTools
             Console.WriteLine("CRI CPK Tool");
             Console.WriteLine("Usage:");
             Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir>   extract CPK all files to target output dir");
-            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>]   replace patch files to CPK");
+            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>]  replace patch files to CPK");
             Console.WriteLine("");
             Console.WriteLine("Demo:");
             Console.WriteLine("  CriPakTools.exe extract_all -p original.cpk -o extracted_files");
@@ -261,6 +261,7 @@ namespace CriPakTools
             string inputDir = "";
             string outputCpk = "";
             bool uncompressed = false;
+            bool nameless = false;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -282,6 +283,10 @@ namespace CriPakTools
                 else if (args[i] == "-nc")
                 {
                     uncompressed = true;
+                }
+                else if (args[i] == "-nl")
+                {
+                    nameless = true;
                 }
             }
 
@@ -309,7 +314,7 @@ namespace CriPakTools
             Console.WriteLine($"Patch CPK: {outputCpk}");
             Console.WriteLine($"Compressed: {(uncompressed ? "No" : "Yes")}");
 
-            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed);
+            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed, nameless);
 
             Console.WriteLine("Patch finished!");
         }
@@ -335,9 +340,10 @@ namespace CriPakTools
             }
         }
 
-        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed)
+        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed, bool nameless)
         {
             cpkContentName = cpkPath;
+            cpkContent.isNamelessPack = nameless;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
             List<string> inputFiles = GetAllFiles(inputDir);

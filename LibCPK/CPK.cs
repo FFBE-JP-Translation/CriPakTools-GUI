@@ -313,8 +313,6 @@ namespace LibCPK
 
         public bool ReadITOC(EndianReader br, ulong startoffset, ulong ContentOffset, ushort Align)
         {
-            isNamelessPack = true;
-
             br.BaseStream.Seek((long)startoffset, SeekOrigin.Begin);
 
             if (Tools.ReadCString(br, 4) != "ITOC")

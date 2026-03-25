@@ -105,14 +105,7 @@ namespace CriPakGUI
                 CPKPatchInfo t = new CPKPatchInfo();
                 t.cpkDir = cpkDir;
                 t.patchDir = patchDir;
-                if (checkbox_donotcompress.IsChecked == true)
-                {
-                    t.bForceCompress = false;
-                }
-                else
-                {
-                    t.bForceCompress = true;
-                }
+                t.bForceCompress = false;
                 t.batch_file_list = batch_file_list;
                 ThreadPool.QueueUserWorkItem(new WaitCallback(PatchCPK), t);
             }
