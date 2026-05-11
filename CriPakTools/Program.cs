@@ -105,11 +105,12 @@ namespace CriPakTools
             {
                 if (entry.ID != null)
                 {
-                    if (ids.Contains((int)entry.ID))
+                    if (ids.Contains(Convert.ToInt32(entry.ID)))
                     {
                         return true;
                     }
-                    ids.Add((int)entry.ID);
+
+                    ids.Add(Convert.ToInt32(entry.ID));
                 }
             }
 
@@ -168,6 +169,20 @@ namespace CriPakTools
 
         static void ExtractAll(string cpkPath, string outputDir)
         {
+            if (Directory.Exists(outputDir))
+            {
+                Console.WriteLine($"Output directory already exists, deleting: {outputDir}");
+                try
+                {
+                    Directory.Delete(outputDir, true);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error deleting directory: {ex.Message}");
+                    Console.WriteLine("Try to continue with existing directory...");
+                }
+            }
+
             cpkContentName = cpkPath;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
@@ -208,7 +223,7 @@ namespace CriPakTools
                     }
 
                     string fileName;
-                    int id = entry.ID == null ? -1 : (int)entry.ID;
+                    int id = entry.ID == null ? -1 : Convert.ToInt32(entry.ID);
 
                     if (id >= 0 && hasDuplicateIds)
                     {
@@ -238,11 +253,14 @@ namespace CriPakTools
                         }
                     }
 
-                    if (cpkContent.isNamelessPack) {
+                    if (cpkContent.isNamelessPack)
+                    {
                         fileName += DetectFileExtension(fileData, fileData.Length);
                     }
 
                     string outputPath = Path.Combine(finalOutputDir, fileName);
+
+                    outputPath = GetUniqueFilePath(outputPath);
 
                     string outputDirPath = Path.GetDirectoryName(outputPath);
                     if (!Directory.Exists(outputDirPath))
@@ -253,6 +271,29 @@ namespace CriPakTools
                     File.WriteAllBytes(outputPath, fileData);
                 }
             }
+        }
+
+        static string GetUniqueFilePath(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                return filePath;
+            }
+
+            string directory = Path.GetDirectoryName(filePath);
+            string fileNameWithoutExt = Path.GetFileNameWithoutExtension(filePath);
+            string extension = Path.GetExtension(filePath);
+            int counter = 1;
+
+            string newFilePath;
+            do
+            {
+                newFilePath = Path.Combine(directory, $"{fileNameWithoutExt}_[{counter}]{extension}");
+                counter++;
+            }
+            while (File.Exists(newFilePath));
+
+            return newFilePath;
         }
 
         static void ReplaceCommand(string[] args)
