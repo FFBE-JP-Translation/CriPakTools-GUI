@@ -305,8 +305,8 @@ namespace LibCPK
                 }
                  
                 cpk.Write(Encoding.ASCII.GetBytes(ID));
-                // New format archives keep whatever marker the original packets carried.
-                cpk.Write(NewFormat ? unk1 : (Int32)0xff);
+                // The CRI tools store 0 here when the utf table is masked and 0xff when it is plain.
+                cpk.Write(isUtfEncrypted ? 0 : (Int32)0xff);
                 cpk.Write((UInt64)encrypted.Length);
                 cpk.Write(encrypted);
             }
@@ -1106,10 +1106,10 @@ namespace LibCPK
         public bool isNamelessPack { get; set; }
 
         /// <summary>
-        /// The archive uses the "new" CPK format: every file is scrambled with a key derived
-        /// from its name (see <see cref="AssetCipher"/>), and packet markers are preserved.
+        /// The archive uses the FFBE JP format: every file is encrypted with a key derived
+        /// from its name (see <see cref="AssetCipher"/>).
         /// </summary>
-        public bool NewFormat { get; set; }
+        public bool FfbeJpFormat { get; set; }
         public int unk1 { get; set; }
         public long utf_size { get; set; }
         public byte[] utf_packet { get; set; }

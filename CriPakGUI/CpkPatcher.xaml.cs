@@ -32,7 +32,7 @@ namespace CriPakGUI
             this.WindowStartupLocation = WindowStartupLocation.Manual;
             this.Top = x;
             this.Left = y;
-            checkbox_newFormat.IsChecked = MainApp.Instance.currentPackage.NewFormat;
+            checkbox_ffbeJp.IsChecked = MainApp.Instance.currentPackage.FfbeJpFormat;
         }
 
         private void button_selPatchPath_Click(object sender, RoutedEventArgs e)
@@ -79,7 +79,7 @@ namespace CriPakGUI
             public string cpkDir { get; set; }
             public string patchDir { get; set; }
             public bool bForceCompress { get; set; }
-            public bool bNewFormat { get; set; }
+            public bool bFfbeJpFormat { get; set; }
             public Dictionary<string, string> batch_file_list { get; set; }
         }
 
@@ -108,7 +108,7 @@ namespace CriPakGUI
                 t.cpkDir = cpkDir;
                 t.patchDir = patchDir;
                 t.bForceCompress = false;
-                t.bNewFormat = checkbox_newFormat.IsChecked == true;
+                t.bFfbeJpFormat = checkbox_ffbeJp.IsChecked == true;
                 t.batch_file_list = batch_file_list;
                 ThreadPool.QueueUserWorkItem(new WaitCallback(PatchCPK), t);
             }
@@ -123,7 +123,7 @@ namespace CriPakGUI
         {
             CPKPatchInfo v = (CPKPatchInfo)t;
             PatchCPK patcher = new PatchCPK(MainApp.Instance.currentPackage.CpkContent, MainApp.Instance.currentPackage.CpkContentName);
-            patcher.NewFormat = v.bNewFormat;
+            patcher.FfbeJpFormat = v.bFfbeJpFormat;
             patcher.SetListener(
                 (float value) =>
             {

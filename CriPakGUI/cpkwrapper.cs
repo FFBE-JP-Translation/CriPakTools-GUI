@@ -24,7 +24,7 @@ namespace CriPakGUI
         /// <summary>
         /// New CPK format: files are encrypted with a key derived from their file name.
         /// </summary>
-        public bool NewFormat { get; set; }
+        public bool FfbeJpFormat { get; set; }
     }
     public class CPKTable
     {

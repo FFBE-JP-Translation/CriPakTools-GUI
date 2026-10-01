@@ -88,12 +88,12 @@ namespace CriPakGUI
         }
 
 
-        private void menu_newformat_Click(object sender, RoutedEventArgs e)
+        private void menu_ffbejp_Click(object sender, RoutedEventArgs e)
         {
-            MainApp.Instance.currentPackage.NewFormat = menu_newformat.IsChecked;
+            MainApp.Instance.currentPackage.FfbeJpFormat = menu_ffbejp.IsChecked;
             if (MainApp.Instance.currentPackage.CpkContent != null)
             {
-                MainApp.Instance.currentPackage.CpkContent.NewFormat = menu_newformat.IsChecked;
+                MainApp.Instance.currentPackage.CpkContent.FfbeJpFormat = menu_ffbejp.IsChecked;
             }
         }
 
@@ -198,7 +198,7 @@ namespace CriPakGUI
 
                     byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries[i].FileSize.ToString()));
 
-                    if (MainApp.Instance.currentPackage.NewFormat)
+                    if (MainApp.Instance.currentPackage.FfbeJpFormat)
                     {
                         chunk = AssetCipher.Decrypt(chunk, entries[i].FileName.ToString());
                     }
@@ -316,7 +316,7 @@ namespace CriPakGUI
 
             byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries.FileSize.ToString()));
 
-            if (MainApp.Instance.currentPackage.NewFormat)
+            if (MainApp.Instance.currentPackage.FfbeJpFormat)
             {
                 chunk = AssetCipher.Decrypt(chunk, entries.LocalName);
             }
