@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Decompiled CRI "Packed File Maker for Console" (cpkmakec.exe 2.49.32) with the ffbejp option added.
+    Build:  dotnet build -c Release -p:CpkMakerDir=<folder containing the official CpkMaker.dll>
+    Then copy bin/Release/net40/cpkmakec.exe next to the official CpkMaker.dll / CpkBinder.dll.
+  -->
+  <PropertyGroup>
+    <AssemblyName>cpkmakec</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net40</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>11.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CpkMakerDir Condition="'$(CpkMakerDir)' == ''">official_tool</CpkMakerDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="CpkMaker">
+      <HintPath>$(CpkMakerDir)/CpkMaker.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

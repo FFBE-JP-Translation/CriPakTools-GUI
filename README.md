@@ -34,14 +34,17 @@ CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk -ffbejp
 
 Official CRI tool (cpkmakec.exe)
 --------------------------------
-`tools/patch_official_cpkmaker.py <folder with cpkmakec.exe>` adds `--ffbejp` to the official CPK File Builder command line tool:
+`tools/cpkmakec` is the decompiled source of the official command line CPK builder (cpkmakec.exe 2.49.32) with
+`--ffbejp` built into the code:
 
 ```
-cpkmakec <dir or csv> <out.cpk> -mode=FILENAMEID ... --ffbejp     (pack, files are encrypted first)
+cpkmakec <dir or csv> <out.cpk> -mode=FILENAMEID ... --ffbejp     (pack, files are encrypted by name)
 cpkmakec <in.cpk> -extract=<outdir> --ffbejp                      (extract, files are decrypted afterwards)
 ```
 
-The original tool is kept as `cpkmakec.original.exe` (`--restore` puts it back). A C# compiler is needed (the .NET Framework one is found automatically on Windows).
+Build it with `dotnet build -c Release -p:CpkMakerDir=<folder with the official CpkMaker.dll>` and copy
+`bin/Release/net40/cpkmakec.exe` over the official one (CpkMaker.dll and CpkBinder.dll stay next to it).
+The FFBE JP code is in `tools/cpkmakec/cpkmakecCs/FfbeJp.cs`. Use a mode that stores file names, compression is not supported.
 
 Compiling
 =========
