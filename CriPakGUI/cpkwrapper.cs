@@ -21,6 +21,10 @@ namespace CriPakGUI
         public string BaseName { get; set; }
         public string FileName { get; set; }
         public Encoding EncodingPage = Encoding.GetEncoding((int)PackageEncodings.UTF_8);
+        /// <summary>
+        /// New CPK format: files are encrypted with a key derived from their file name.
+        /// </summary>
+        public bool FfbeJpFormat { get; set; }
     }
     public class CPKTable
     {

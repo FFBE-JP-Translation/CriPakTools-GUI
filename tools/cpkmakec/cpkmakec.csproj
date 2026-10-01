@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Decompiled CRI "Packed File Maker for Console" (cpkmakec.exe 2.49.32) with the ffbejp option added.
+    The official CpkMaker.dll is not part of this repository. Put it (and CpkBinder.dll) in tools/cpkmakec/official_tool
+    (or tools/official_tool), or point to its folder:
+        dotnet build -c Release -p:CpkMakerDir=C:\path\to\official_tool
+    (the CPKMAKER_DIR environment variable works too).
+    Then copy bin/Release/net40/cpkmakec.exe next to the official CpkMaker.dll / CpkBinder.dll.
+  -->
+  <PropertyGroup>
+    <AssemblyName>cpkmakec</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net40</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>11.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <CpkMakerDir Condition="'$(CpkMakerDir)' == ''">$(CPKMAKER_DIR)</CpkMakerDir>
+    <CpkMakerDir Condition="'$(CpkMakerDir)' == '' And Exists('$(MSBuildProjectDirectory)/official_tool/CpkMaker.dll')">$(MSBuildProjectDirectory)/official_tool</CpkMakerDir>
+    <CpkMakerDir Condition="'$(CpkMakerDir)' == '' And Exists('$(MSBuildProjectDirectory)/../official_tool/CpkMaker.dll')">$(MSBuildProjectDirectory)/../official_tool</CpkMakerDir>
+    <CpkMakerDir Condition="'$(CpkMakerDir)' == '' And Exists('$(MSBuildProjectDirectory)/../../official_tool/CpkMaker.dll')">$(MSBuildProjectDirectory)/../../official_tool</CpkMakerDir>
+  </PropertyGroup>
+  <Target Name="CheckCpkMaker" BeforeTargets="ResolveAssemblyReferences;CoreCompile">
+    <Error Condition="'$(CpkMakerDir)' == '' Or !Exists('$(CpkMakerDir)/CpkMaker.dll')"
+           Text="CpkMaker.dll not found. Copy the official tool files (CpkMaker.dll, CpkBinder.dll) to tools/cpkmakec/official_tool or build with -p:CpkMakerDir=&lt;folder containing CpkMaker.dll&gt;." />
+  </Target>
+  <ItemGroup Condition="'$(CpkMakerDir)' != ''">
+    <Reference Include="CpkMaker">
+      <HintPath>$(CpkMakerDir)/CpkMaker.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

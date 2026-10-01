@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AssetCipher.cs" />
     <Compile Include="CPK.cs" />
     <Compile Include="Endian.cs" />
     <Compile Include="PatchCPK.cs" />
