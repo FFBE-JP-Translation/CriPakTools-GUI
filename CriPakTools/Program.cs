@@ -12,18 +12,18 @@ namespace CriPakTools
         {
             Console.WriteLine("CRI CPK Tool");
             Console.WriteLine("Usage:");
-            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-jp]   extract CPK all files to target output dir");
-            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-jp]  replace patch files to CPK");
+            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-ffbejp]   extract CPK all files to target output dir");
+            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-ffbejp]  replace patch files to CPK");
             Console.WriteLine("");
             Console.WriteLine("Options:");
-            Console.WriteLine("  -jp, --ffbejp      FFBE JP CPK format: every file is encrypted with a key derived from its file name.");
+            Console.WriteLine("  -ffbejp           FFBE JP CPK format: every file is encrypted with a key derived from its file name.");
             Console.WriteLine("                      extract_all decrypts the files, replace encrypts the patch files.");
             Console.WriteLine("");
             Console.WriteLine("Demo:");
             Console.WriteLine("  CriPakTools.exe extract_all -p original.cpk -o extracted_files");
             Console.WriteLine("  CriPakTools.exe replace -p original.cpk -i modified_files -o modified.cpk [-nc]");
-            Console.WriteLine("  CriPakTools.exe extract_all -p gallery1.cpk -o extracted_files --ffbejp");
-            Console.WriteLine("  CriPakTools.exe replace -p gallery1.cpk -i modified_files -o modified.cpk --ffbejp");
+            Console.WriteLine("  CriPakTools.exe extract_all -p gallery1.cpk -o extracted_files -ffbejp");
+            Console.WriteLine("  CriPakTools.exe replace -p gallery1.cpk -i modified_files -o modified.cpk -ffbejp");
         }
 
         static CPK cpkContent = new CPK();
@@ -112,7 +112,7 @@ namespace CriPakTools
 
         static bool IsFfbeJpFlag(string arg)
         {
-            return arg == "-jp" || arg == "--ffbejp";
+            return arg == "-ffbejp";
         }
 
         static bool CheckDuplicateIds(List<FileEntry> entries)

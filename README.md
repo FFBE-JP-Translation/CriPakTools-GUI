@@ -24,13 +24,24 @@ FFBE JP CPK format (per-file encryption)
 The Japanese version of FFBE stores every file in its CPKs encrypted with a key derived from the file's own name
 (see `LibCPK/AssetCipher.cs` for the algorithm). Use the *FFBE JP format* option to handle these archives:
 
-* CLI: add `-jp` / `--ffbejp` to `extract_all` (decrypts the files) and to `replace` (encrypts the patch files).
+* CLI: add `-jp` / `-ffbejp` to `extract_all` (decrypts the files) and to `replace` (encrypts the patch files).
 * GUI: tick `Options > FFBE JP format (per-file encryption)` before extracting, or the checkbox in the *Patch CPK* window.
 
 ```
-CriPakTools.exe extract_all -p gallery1.cpk -o extracted --ffbejp
-CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk --ffbejp
+CriPakTools.exe extract_all -p gallery1.cpk -o extracted -ffbejp
+CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk -ffbejp
 ```
+
+Official CRI tool (cpkmakec.exe)
+--------------------------------
+`tools/patch_official_cpkmaker.py <folder with cpkmakec.exe>` adds `--ffbejp` to the official CPK File Builder command line tool:
+
+```
+cpkmakec <dir or csv> <out.cpk> -mode=FILENAMEID ... --ffbejp     (pack, files are encrypted first)
+cpkmakec <in.cpk> -extract=<outdir> --ffbejp                      (extract, files are decrypted afterwards)
+```
+
+The original tool is kept as `cpkmakec.original.exe` (`--restore` puts it back). A C# compiler is needed (the .NET Framework one is found automatically on Windows).
 
 Compiling
 =========
