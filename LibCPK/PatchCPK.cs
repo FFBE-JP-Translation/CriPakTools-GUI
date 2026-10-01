@@ -15,6 +15,12 @@ namespace LibCPK
         private Action<float> onProgressChanged;
         private Action<string> onMsgUpdateChanged;
         private Action onCompleteChanged;
+
+        /// <summary>
+        /// Patch an archive in the "new" format: replacement files are scrambled with their
+        /// per-file key and the original header/TOC area (including its padding) is kept verbatim.
+        /// </summary>
+        public bool NewFormat { get; set; }
         public PatchCPK(CPK pCpk, string oldContentName)
         {
             this.cpk = pCpk;
@@ -59,6 +65,12 @@ namespace LibCPK
 
         public void Patch(string outputFilePath, bool bForceCompress, Dictionary<string, string> batch_file_list)
         {
+            if (NewFormat)
+            {
+                PatchNewFormat(outputFilePath, bForceCompress, batch_file_list);
+                return;
+            }
+
             Dictionary<string, string> fileMap = batch_file_list;
 
             // Build nameless map
@@ -277,6 +289,194 @@ namespace LibCPK
             onMsgUpdateChanged?.Invoke(msg);
             Debug.Print(msg);
             onCompleteChanged.Invoke();
+        }
+
+        private static long AlignUp(long value, int align)
+        {
+            return align > 1 ? (value + align - 1) / align * align : value;
+        }
+
+        private static void CopyRange(Stream source, Stream target, long offset, long length)
+        {
+            byte[] buffer = new byte[81920];
+            source.Seek(offset, SeekOrigin.Begin);
+            while (length > 0)
+            {
+                int read = source.Read(buffer, 0, (int)Math.Min(buffer.Length, length));
+                if (read <= 0)
+                {
+                    throw new EndOfStreamException("Unexpected end of CPK while copying data.");
+                }
+                target.Write(buffer, 0, read);
+                length -= read;
+            }
+        }
+
+        /// <summary>
+        /// New format patching. The archive layout (header, TOC, ITOC, GTOC and their padding)
+        /// is taken from the original CPK, files are re-packed back to back using the archive's
+        /// alignment, and replacement files are encrypted with their per-file key.
+        /// </summary>
+        private void PatchNewFormat(string outputFilePath, bool bForceCompress, Dictionary<string, string> fileMap)
+        {
+            if (cpk.isNamelessPack)
+            {
+                throw new NotSupportedException("The new format can not be combined with nameless packs.");
+            }
+
+            cpk.NewFormat = true;
+
+            List<FileEntry> entries = cpk.fileTable.Where(x => x.FileType == "FILE").OrderBy(x => x.FileOffset).ToList();
+            long contentOffset = (long)cpk.ContentOffset;
+
+            foreach (ulong tocPos in new ulong[] { cpk.TocOffset, cpk.ItocOffset, cpk.GtocOffset, cpk.EtocOffset })
+            {
+                if (tocPos != ulong.MaxValue && (long)tocPos >= contentOffset)
+                {
+                    throw new NotSupportedException("The new format expects every TOC packet to be located before the file data.");
+                }
+            }
+
+            int align = 1;
+            object alignValue;
+            if (cpk.cpkdata != null && cpk.cpkdata.TryGetValue("Align", out alignValue) && alignValue != null)
+            {
+                align = Math.Max(1, Convert.ToInt32(alignValue));
+            }
+
+            bool bFileRepeated = Tools.CheckListRedundant(entries);
+
+            string msg;
+            using (FileStream oldFile = File.OpenRead(cpkContentName))
+            using (FileStream newCPK = new FileStream(outputFilePath, FileMode.Create, FileAccess.ReadWrite))
+            {
+                // The padding between files is not zero in these archives, take it over from the original.
+                byte[] padPattern = new byte[0];
+                for (int i = 0; i + 1 < entries.Count; i++)
+                {
+                    long gapStart = (long)entries[i].FileOffset + Convert.ToInt64(entries[i].FileSize);
+                    long gap = (long)entries[i + 1].FileOffset - gapStart;
+                    if (gap > padPattern.Length && gap < align)
+                    {
+                        padPattern = new byte[gap];
+                        oldFile.Seek(gapStart, SeekOrigin.Begin);
+                        oldFile.Read(padPattern, 0, (int)gap);
+                    }
+                }
+
+                // Header, TOC, ITOC, GTOC ... exactly as in the original archive.
+                CopyRange(oldFile, newCPK, 0, contentOffset);
+
+                long oldPackedSum = 0, oldDataSum = 0, newPackedSum = 0, newDataSum = 0;
+
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    onProgressChanged?.Invoke((float)i / (float)entries.Count * 100f);
+
+                    FileEntry entry = entries[i];
+                    string name = entry.FileName.ToString();
+                    string currentName = (entry.DirName != null ? entry.DirName + "/" : "") + name;
+                    if (entry.ID != null && Convert.ToInt32(entry.ID) > 0 && bFileRepeated)
+                    {
+                        currentName = (entry.DirName != null ? entry.DirName + "/" : "") +
+                                      string.Format("[{0}]", Convert.ToInt32(entry.ID)) + name;
+                    }
+                    if (!currentName.Contains("/"))
+                    {
+                        currentName = "/" + currentName;
+                    }
+
+                    long oldSize = Convert.ToInt64(entry.FileSize);
+                    long oldExtractSize = entry.ExtractSize != null ? Convert.ToInt64(entry.ExtractSize) : oldSize;
+                    oldPackedSum += oldSize;
+                    oldDataSum += oldExtractSize;
+
+                    byte[] data;
+                    int extractSize = (int)oldExtractSize;
+                    bool replaced = fileMap.ContainsKey(currentName);
+                    if (replaced)
+                    {
+                        onMsgUpdateChanged?.Invoke(string.Format("Patching: {0}", currentName));
+                        byte[] newbie = File.ReadAllBytes(fileMap[currentName]);
+                        extractSize = newbie.Length;
+                        if (oldSize < oldExtractSize && bForceCompress)
+                        {
+                            onMsgUpdateChanged?.Invoke(string.Format("Compressing data:{0:x8}", newbie.Length));
+                            newbie = cpk.CompressCRILAYLA(newbie);
+                        }
+                        data = AssetCipher.Encrypt(newbie, name);
+                    }
+                    else
+                    {
+                        // Untouched files are copied in their stored (already encrypted) form.
+                        data = new byte[oldSize];
+                        oldFile.Seek((long)entry.FileOffset, SeekOrigin.Begin);
+                        int read = oldFile.Read(data, 0, data.Length);
+                        if (read != data.Length)
+                        {
+                            throw new EndOfStreamException("Unexpected end of CPK while reading " + name);
+                        }
+                    }
+
+                    // Align the start of the file (relative to the content area).
+                    long relative = newCPK.Position - contentOffset;
+                    long pad = AlignUp(relative, align) - relative;
+                    for (long j = 0; j < pad; j++)
+                    {
+                        newCPK.WriteByte(j < padPattern.Length ? padPattern[j] : (byte)0);
+                    }
+
+                    entry.FileOffset = (ulong)newCPK.Position;
+                    if (replaced)
+                    {
+                        entry.FileSize = Convert.ChangeType(data.Length, entry.FileSizeType);
+                        entry.ExtractSize = Convert.ChangeType(extractSize, entry.ExtractSizeType);
+                    }
+                    cpk.UpdateFileEntry(entry);
+                    newCPK.Write(data, 0, data.Length);
+
+                    newPackedSum += data.Length;
+                    newDataSum += extractSize;
+                    onMsgUpdateChanged?.Invoke(string.Format("Update Entry: {0}, {1:x8}", entry.FileName, entry.FileOffset));
+                }
+
+                // CPK header: keep the totals consistent with the new file sizes.
+                long contentSize = AlignUp(newCPK.Position - contentOffset, align);
+                cpk.UpdateHeaderValue("ContentSize", contentSize);
+                UpdateHeaderTotal("EnabledPackedSize", oldPackedSum, newPackedSum);
+                UpdateHeaderTotal("EnabledDataSize", oldDataSum, newDataSum);
+
+                onMsgUpdateChanged?.Invoke("Writing TOC....");
+                BinaryWriter packetWriter = new BinaryWriter(newCPK);
+                cpk.WritePacket(packetWriter, "CPK ", 0, cpk.CPK_packet);
+                cpk.WriteITOC(packetWriter);
+                cpk.WriteTOC(packetWriter);
+                cpk.WriteETOC(packetWriter);
+                cpk.WriteGTOC(packetWriter);
+                packetWriter.Flush();
+            }
+
+            msg = string.Format("Saving CPK to {0}....", outputFilePath);
+            onMsgUpdateChanged?.Invoke(msg);
+            Debug.Print(msg);
+            onCompleteChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Header totals (EnabledPackedSize / EnabledDataSize) are a multiple of the per-file sums
+        /// (the original tool counts every file once per file table), keep that factor.
+        /// </summary>
+        private void UpdateHeaderTotal(string column, long oldSum, long newSum)
+        {
+            object current;
+            if (cpk.cpkdata == null || !cpk.cpkdata.TryGetValue(column, out current) || current == null || oldSum <= 0)
+            {
+                return;
+            }
+
+            long oldTotal = Convert.ToInt64(current);
+            long factor = (oldTotal % oldSum == 0 && oldTotal / oldSum > 0) ? oldTotal / oldSum : 1;
+            cpk.UpdateHeaderValue(column, newSum * factor);
         }
     }
 }

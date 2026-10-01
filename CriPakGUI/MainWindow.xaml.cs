@@ -88,6 +88,15 @@ namespace CriPakGUI
         }
 
 
+        private void menu_newformat_Click(object sender, RoutedEventArgs e)
+        {
+            MainApp.Instance.currentPackage.NewFormat = menu_newformat.IsChecked;
+            if (MainApp.Instance.currentPackage.CpkContent != null)
+            {
+                MainApp.Instance.currentPackage.CpkContent.NewFormat = menu_newformat.IsChecked;
+            }
+        }
+
         private void menu_importAssets_Click(object sender, RoutedEventArgs e)
         {
             CpkPatcher patcherWindow = new CpkPatcher(this.Top, this.Left);
@@ -187,10 +196,14 @@ namespace CriPakGUI
 
                     oldFile.BaseStream.Seek((long)entries[i].FileOffset, SeekOrigin.Begin);
 
-                    string isComp = Encoding.ASCII.GetString(oldFile.ReadBytes(8));
-                    oldFile.BaseStream.Seek((long)entries[i].FileOffset, SeekOrigin.Begin);
-
                     byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries[i].FileSize.ToString()));
+
+                    if (MainApp.Instance.currentPackage.NewFormat)
+                    {
+                        chunk = AssetCipher.Decrypt(chunk, entries[i].FileName.ToString());
+                    }
+
+                    string isComp = Encoding.ASCII.GetString(chunk, 0, Math.Min(8, chunk.Length));
 
                     if (isComp == "CRILAYLA")
                     {
@@ -301,10 +314,14 @@ namespace CriPakGUI
             BinaryReader oldFile = new BinaryReader(File.OpenRead(MainApp.Instance.currentPackage.CpkContentName));
             oldFile.BaseStream.Seek((long)entries.FileOffset, SeekOrigin.Begin);
 
-            string isComp = Encoding.ASCII.GetString(oldFile.ReadBytes(8));
-            oldFile.BaseStream.Seek((long)entries.FileOffset, SeekOrigin.Begin);
-
             byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries.FileSize.ToString()));
+
+            if (MainApp.Instance.currentPackage.NewFormat)
+            {
+                chunk = AssetCipher.Decrypt(chunk, entries.LocalName);
+            }
+
+            string isComp = Encoding.ASCII.GetString(chunk, 0, Math.Min(8, chunk.Length));
 
             if (isComp == "CRILAYLA")
             {

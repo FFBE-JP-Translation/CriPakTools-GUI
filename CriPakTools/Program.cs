@@ -12,12 +12,19 @@ namespace CriPakTools
         {
             Console.WriteLine("CRI CPK Tool");
             Console.WriteLine("Usage:");
-            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir>   extract CPK all files to target output dir");
-            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>]  replace patch files to CPK");
+            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-nf]   extract CPK all files to target output dir");
+            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-nf]  replace patch files to CPK");
+            Console.WriteLine("");
+            Console.WriteLine("Options:");
+            Console.WriteLine("  -nf, --new-format   new CPK format (JP FFBE): every file is encrypted with a key derived from its file name.");
+            Console.WriteLine("                      extract_all decrypts the files, replace encrypts the patch files and keeps the");
+            Console.WriteLine("                      original header/padding so unchanged input reproduces the original CPK byte for byte.");
             Console.WriteLine("");
             Console.WriteLine("Demo:");
             Console.WriteLine("  CriPakTools.exe extract_all -p original.cpk -o extracted_files");
             Console.WriteLine("  CriPakTools.exe replace -p original.cpk -i modified_files -o modified.cpk [-nc]");
+            Console.WriteLine("  CriPakTools.exe extract_all -p gallery1.cpk -o extracted_files --new-format");
+            Console.WriteLine("  CriPakTools.exe replace -p gallery1.cpk -i modified_files -o modified.cpk --new-format");
         }
 
         static CPK cpkContent = new CPK();
@@ -60,6 +67,7 @@ namespace CriPakTools
         {
             string cpkPath = "";
             string outputDir = "";
+            bool newFormat = false;
 
             // 解析参数
             for (int i = 1; i < args.Length; i++)
@@ -73,6 +81,10 @@ namespace CriPakTools
                 {
                     outputDir = args[i + 1];
                     i++;
+                }
+                else if (IsNewFormatFlag(args[i]))
+                {
+                    newFormat = true;
                 }
             }
 
@@ -92,9 +104,16 @@ namespace CriPakTools
             Console.WriteLine($"Start extract CPK: {cpkPath}");
             Console.WriteLine($"Ouput dir: {outputDir}");
 
-            ExtractAll(cpkPath, outputDir);
+            Console.WriteLine($"New format: {(newFormat ? "Yes" : "No")}");
+
+            ExtractAll(cpkPath, outputDir, newFormat);
 
             Console.WriteLine("\rExtract finished!");
+        }
+
+        static bool IsNewFormatFlag(string arg)
+        {
+            return arg == "-nf" || arg == "--new-format";
         }
 
         static bool CheckDuplicateIds(List<FileEntry> entries)
@@ -167,7 +186,7 @@ namespace CriPakTools
             return "";
         }
 
-        static void ExtractAll(string cpkPath, string outputDir)
+        static void ExtractAll(string cpkPath, string outputDir, bool newFormat)
         {
             if (Directory.Exists(outputDir))
             {
@@ -184,6 +203,7 @@ namespace CriPakTools
             }
 
             cpkContentName = cpkPath;
+            cpkContent.NewFormat = newFormat;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
             string finalOutputDir = outputDir;
@@ -239,10 +259,14 @@ namespace CriPakTools
 
                     reader.BaseStream.Seek((long)entry.FileOffset, SeekOrigin.Begin);
 
-                    string magic = Encoding.ASCII.GetString(reader.ReadBytes(8));
-                    reader.BaseStream.Seek((long)entry.FileOffset, SeekOrigin.Begin);
-
                     byte[] fileData = reader.ReadBytes(Int32.Parse(entry.FileSize.ToString()));
+
+                    if (newFormat)
+                    {
+                        fileData = AssetCipher.Decrypt(fileData, entry.FileName.ToString());
+                    }
+
+                    string magic = Encoding.ASCII.GetString(fileData, 0, Math.Min(8, fileData.Length));
 
                     if (magic == "CRILAYLA")
                     {
@@ -303,6 +327,7 @@ namespace CriPakTools
             string outputCpk = "";
             bool uncompressed = false;
             bool nameless = false;
+            bool newFormat = false;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -329,6 +354,10 @@ namespace CriPakTools
                 {
                     nameless = true;
                 }
+                else if (IsNewFormatFlag(args[i]))
+                {
+                    newFormat = true;
+                }
             }
 
             if (string.IsNullOrEmpty(cpkPath) || string.IsNullOrEmpty(inputDir) || string.IsNullOrEmpty(outputCpk))
@@ -354,8 +383,9 @@ namespace CriPakTools
             Console.WriteLine($"Input dir: {inputDir}");
             Console.WriteLine($"Patch CPK: {outputCpk}");
             Console.WriteLine($"Compressed: {(uncompressed ? "No" : "Yes")}");
+            Console.WriteLine($"New format: {(newFormat ? "Yes" : "No")}");
 
-            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed, nameless);
+            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed, nameless, newFormat);
 
             Console.WriteLine("Patch finished!");
         }
@@ -381,10 +411,11 @@ namespace CriPakTools
             }
         }
 
-        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed, bool nameless)
+        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed, bool nameless, bool newFormat)
         {
             cpkContentName = cpkPath;
             cpkContent.isNamelessPack = nameless;
+            cpkContent.NewFormat = newFormat;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
             List<string> inputFiles = GetAllFiles(inputDir);
@@ -403,6 +434,7 @@ namespace CriPakTools
             Console.WriteLine("Start patch CPK ...");
 
             PatchCPK patcher = new PatchCPK(cpkContent, cpkContentName);
+            patcher.NewFormat = newFormat;
             patcher.SetListener(
                 (float value) =>
                 {

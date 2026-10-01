@@ -19,6 +19,22 @@ I forked and added more features in the *NEW* GUI Version.
 Tool to extract/update contents of CRIWARE's CPK archive format. (aka CRI FileMajik)  
 This is based on codes uploaded by Falo's code released on the Xentax forums (http://forum.xentax.com/viewtopic.php?f=10&t=10646) which was futher modified by Nanashi3 (http://forums.fuwanovel.org/index.php?/topic/1785-request-for-psp-hackers/page-4),and esperknight (https://github.com/esperknight/CriPakTools).  
 
+New CPK format (per-file encryption)
+====================================
+Some CPKs (e.g. the Japanese version of FFBE) store every file scrambled with a key derived from the
+file's own name (see `LibCPK/AssetCipher.cs` for the algorithm). Use the *new format* option to handle them:
+
+* CLI: add `-nf` / `--new-format` to `extract_all` (decrypts the files) and to `replace` (encrypts the patch files).
+* GUI: tick `Options > New format (per-file encryption)` before extracting, or the checkbox in the *Patch CPK* window.
+
+```
+CriPakTools.exe extract_all -p gallery1.cpk -o extracted --new-format
+CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk --new-format
+```
+
+In new format mode the header, TOC and padding of the original CPK are kept, so re-packing the unmodified
+extracted files reproduces the original CPK byte for byte.
+
 Compiling
 =========
 Install Visual Stuidio 2019 & Visual C++ V142.

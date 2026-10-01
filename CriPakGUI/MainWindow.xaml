@@ -38,6 +38,10 @@
                 <MenuItem Header="Make filelist.csv" Click="menu_makeCSV_Click"/>
 
             </MenuItem>
+            <MenuItem Header="_Options">
+                <MenuItem x:Name="menu_newformat" Header="New format (per-file encryption)" IsCheckable="True" Click="menu_newformat_Click"
+                          ToolTip="Enable for the new CPK format (JP FFBE) where every file is encrypted with a key derived from its file name."/>
+            </MenuItem>
             <MenuItem Header="_Encodings">
                 <ComboBox Name="comboBox_encodings" SelectedIndex="0" SelectionChanged="comboBox_encodings_SelectionChanged">
                     <ComboBoxItem>
