@@ -12,6 +12,8 @@
         <ProgressBar x:Name="progressbar1" HorizontalAlignment="Center" Height="18" Margin="0,186,0,0" VerticalAlignment="Top" Width="414"/>
         <Label Content="Progress:" HorizontalAlignment="Left" Margin="28,182,0,0" VerticalAlignment="Top" Width="77" Height="27" FontSize="10"/>
         <Button x:Name="button_PatchCPK" Content="Patch CPK" HorizontalAlignment="Left" Margin="28,137,0,0" VerticalAlignment="Top" Width="75" Height="23" Click="button_PatchCPK_Click"/>
+        <CheckBox x:Name="checkbox_ffbeJp" Content="FFBE JP format (per-file encryption)" HorizontalAlignment="Left" Margin="120,141,0,0" VerticalAlignment="Top"
+                  ToolTip="Encrypt the patch files with the per-file key of the FFBE JP CPK format and keep the original header layout."/>
         <ScrollViewer x:Name="scrollview0" HorizontalAlignment="Left" Height="50" Margin="26,223,0,0" VerticalAlignment="Top" Width="414" VerticalScrollBarVisibility="Auto">
             <TextBlock x:Name="textblock0" TextWrapping="WrapWithOverflow" ScrollViewer.CanContentScroll="True"/>
         </ScrollViewer>

@@ -12,12 +12,18 @@ namespace CriPakTools
         {
             Console.WriteLine("CRI CPK Tool");
             Console.WriteLine("Usage:");
-            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir>   extract CPK all files to target output dir");
-            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>]  replace patch files to CPK");
+            Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-ffbejp]   extract CPK all files to target output dir");
+            Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-ffbejp]  replace patch files to CPK");
+            Console.WriteLine("");
+            Console.WriteLine("Options:");
+            Console.WriteLine("  -ffbejp           FFBE JP CPK format: every file is encrypted with a key derived from its file name.");
+            Console.WriteLine("                      extract_all decrypts the files, replace encrypts the patch files.");
             Console.WriteLine("");
             Console.WriteLine("Demo:");
             Console.WriteLine("  CriPakTools.exe extract_all -p original.cpk -o extracted_files");
             Console.WriteLine("  CriPakTools.exe replace -p original.cpk -i modified_files -o modified.cpk [-nc]");
+            Console.WriteLine("  CriPakTools.exe extract_all -p gallery1.cpk -o extracted_files -ffbejp");
+            Console.WriteLine("  CriPakTools.exe replace -p gallery1.cpk -i modified_files -o modified.cpk -ffbejp");
         }
 
         static CPK cpkContent = new CPK();
@@ -60,6 +66,7 @@ namespace CriPakTools
         {
             string cpkPath = "";
             string outputDir = "";
+            bool ffbeJp = false;
 
             // 解析参数
             for (int i = 1; i < args.Length; i++)
@@ -73,6 +80,10 @@ namespace CriPakTools
                 {
                     outputDir = args[i + 1];
                     i++;
+                }
+                else if (IsFfbeJpFlag(args[i]))
+                {
+                    ffbeJp = true;
                 }
             }
 
@@ -92,9 +103,16 @@ namespace CriPakTools
             Console.WriteLine($"Start extract CPK: {cpkPath}");
             Console.WriteLine($"Ouput dir: {outputDir}");
 
-            ExtractAll(cpkPath, outputDir);
+            Console.WriteLine($"FFBE JP format: {(ffbeJp ? "Yes" : "No")}");
+
+            ExtractAll(cpkPath, outputDir, ffbeJp);
 
             Console.WriteLine("\rExtract finished!");
+        }
+
+        static bool IsFfbeJpFlag(string arg)
+        {
+            return arg == "-ffbejp";
         }
 
         static bool CheckDuplicateIds(List<FileEntry> entries)
@@ -167,7 +185,7 @@ namespace CriPakTools
             return "";
         }
 
-        static void ExtractAll(string cpkPath, string outputDir)
+        static void ExtractAll(string cpkPath, string outputDir, bool ffbeJp)
         {
             if (Directory.Exists(outputDir))
             {
@@ -184,6 +202,7 @@ namespace CriPakTools
             }
 
             cpkContentName = cpkPath;
+            cpkContent.FfbeJpFormat = ffbeJp;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
             string finalOutputDir = outputDir;
@@ -239,10 +258,14 @@ namespace CriPakTools
 
                     reader.BaseStream.Seek((long)entry.FileOffset, SeekOrigin.Begin);
 
-                    string magic = Encoding.ASCII.GetString(reader.ReadBytes(8));
-                    reader.BaseStream.Seek((long)entry.FileOffset, SeekOrigin.Begin);
-
                     byte[] fileData = reader.ReadBytes(Int32.Parse(entry.FileSize.ToString()));
+
+                    if (ffbeJp)
+                    {
+                        fileData = AssetCipher.Decrypt(fileData, entry.FileName.ToString());
+                    }
+
+                    string magic = Encoding.ASCII.GetString(fileData, 0, Math.Min(8, fileData.Length));
 
                     if (magic == "CRILAYLA")
                     {
@@ -303,6 +326,7 @@ namespace CriPakTools
             string outputCpk = "";
             bool uncompressed = false;
             bool nameless = false;
+            bool ffbeJp = false;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -329,6 +353,10 @@ namespace CriPakTools
                 {
                     nameless = true;
                 }
+                else if (IsFfbeJpFlag(args[i]))
+                {
+                    ffbeJp = true;
+                }
             }
 
             if (string.IsNullOrEmpty(cpkPath) || string.IsNullOrEmpty(inputDir) || string.IsNullOrEmpty(outputCpk))
@@ -354,8 +382,9 @@ namespace CriPakTools
             Console.WriteLine($"Input dir: {inputDir}");
             Console.WriteLine($"Patch CPK: {outputCpk}");
             Console.WriteLine($"Compressed: {(uncompressed ? "No" : "Yes")}");
+            Console.WriteLine($"FFBE JP format: {(ffbeJp ? "Yes" : "No")}");
 
-            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed, nameless);
+            ReplaceFiles(cpkPath, inputDir, outputCpk, uncompressed, nameless, ffbeJp);
 
             Console.WriteLine("Patch finished!");
         }
@@ -381,10 +410,11 @@ namespace CriPakTools
             }
         }
 
-        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed, bool nameless)
+        static void ReplaceFiles(string cpkPath, string inputDir, string outputCpk, bool uncompressed, bool nameless, bool ffbeJp)
         {
             cpkContentName = cpkPath;
             cpkContent.isNamelessPack = nameless;
+            cpkContent.FfbeJpFormat = ffbeJp;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
             List<string> inputFiles = GetAllFiles(inputDir);
@@ -403,6 +433,7 @@ namespace CriPakTools
             Console.WriteLine("Start patch CPK ...");
 
             PatchCPK patcher = new PatchCPK(cpkContent, cpkContentName);
+            patcher.FfbeJpFormat = ffbeJp;
             patcher.SetListener(
                 (float value) =>
                 {
