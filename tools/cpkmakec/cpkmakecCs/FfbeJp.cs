@@ -72,6 +72,18 @@ public static class FfbeJp
 		return result;
 	}
 
+	/// <summary>Decrypts the first bytes of a file from the stored bytes starting at offset size / 2 + size % 2.</summary>
+	public static byte[] DecryptPrefix(byte[] middle, string fileName)
+	{
+		uint hash = KeyHash(fileName);
+		byte[] result = new byte[middle.Length];
+		for (int i = 0; i < middle.Length; i++)
+		{
+			result[i] = (byte)(KeyByte(hash, i) ^ middle[i]);
+		}
+		return result;
+	}
+
 	public static byte[] Encrypt(byte[] data, string fileName)
 	{
 		if (!AppliesTo(fileName))
@@ -309,6 +321,85 @@ public static class FfbeJp
 			}
 		}
 		return count;
+	}
+
+	private static readonly string[] Magics =
+	{
+		"\u0089PNG", "CRILAYLA", "OggS", "RIFF", "DDS ", "PK\u0003\u0004", "@UTF", "CRID", "GIF8", "BM", "\u00FF\u00D8\u00FF",
+		"AFS2", "CPK ", "ID3", "\u007FELF", "#!", "<?xml", "{", "[", "\u00EF\u00BB\u00BF"
+	};
+
+	private static bool LooksValid(byte[] head)
+	{
+		string text = Encoding.GetEncoding(28591).GetString(head);
+		foreach (string magic in Magics)
+		{
+			if (text.StartsWith(magic, StringComparison.Ordinal))
+			{
+				return true;
+			}
+		}
+		foreach (byte b in head)
+		{
+			if (!(b == 9 || b == 10 || b == 13 || (b >= 0x20 && b < 0x7F)))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static byte[] ReadAt(FileStream fs, long offset, int length)
+	{
+		byte[] buffer = new byte[length];
+		fs.Seek(offset, SeekOrigin.Begin);
+		int read = 0;
+		while (read < length)
+		{
+			int n = fs.Read(buffer, read, length - read);
+			if (n <= 0)
+			{
+				break;
+			}
+			read += n;
+		}
+		return buffer;
+	}
+
+	/// <summary>
+	/// Tells whether the files of a CPK are stored encrypted (FFBE JP) or as they are (regular) by checking which
+	/// variant of the first bytes of the files looks like real data (known signatures or text).
+	/// Returns 1 for FFBE JP, 0 for regular and -1 if it cannot be told.
+	/// </summary>
+	public static int DetectFormat(string cpkPath)
+	{
+		int regularVotes = 0;
+		int ffbeJpVotes = 0;
+		using (FileStream fs = File.OpenRead(cpkPath))
+		{
+			foreach (Entry e in ReadEntries(fs))
+			{
+				string key = KeyName(e.Name);
+				if (!AppliesTo(key) || e.Size < 32)
+				{
+					continue;
+				}
+				byte[] head = ReadAt(fs, e.Offset, 16);
+				byte[] middle = ReadAt(fs, e.Offset + e.Size / 2 + (e.Size & 1), 16);
+				byte[] plain = DecryptPrefix(middle, key);
+				bool regular = LooksValid(head);
+				bool ffbeJp = LooksValid(plain);
+				if (regular && !ffbeJp)
+				{
+					regularVotes++;
+				}
+				else if (ffbeJp && !regular)
+				{
+					ffbeJpVotes++;
+				}
+			}
+		}
+		return ffbeJpVotes > regularVotes ? 1 : (regularVotes > ffbeJpVotes ? 0 : -1);
 	}
 
 	/// <summary>Creates a temporary copy of the CPK; it is deleted when the program ends.</summary>

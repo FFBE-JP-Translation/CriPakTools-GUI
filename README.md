@@ -40,6 +40,8 @@ CriPakTools.exe convert -p gallery1_regular.cpk -o gallery1.cpk -to ffbejp
 cpkmakec gallery1.cpk -convert=gallery1_regular.cpk -to=regular
 ```
 
+Before converting, the current format is detected (from the file signatures of the stored files) and the conversion is refused if the CPK is already in the target format or the format can not be told. Add `-force` to skip the check.
+
 Official CRI tool (cpkmakec.exe)
 --------------------------------
 `tools/cpkmakec` is the decompiled source of the official command line CPK builder (cpkmakec.exe 2.49.32) with

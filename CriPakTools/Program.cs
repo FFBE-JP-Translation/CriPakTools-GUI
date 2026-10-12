@@ -14,7 +14,7 @@ namespace CriPakTools
             Console.WriteLine("Usage:");
             Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-ffbejp]   extract CPK all files to target output dir");
             Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-ffbejp]  replace patch files to CPK");
-            Console.WriteLine("  convert -p <cpk_file> -o <output_cpk> -to <ffbejp|regular>   convert a CPK between the regular and the FFBE JP format");
+            Console.WriteLine("  convert -p <cpk_file> -o <output_cpk> -to <ffbejp|regular> [-force]   convert a CPK between the regular and the FFBE JP format (the current format is checked first)");
             Console.WriteLine("");
             Console.WriteLine("Options:");
             Console.WriteLine("  -ffbejp           FFBE JP CPK format: every file is encrypted with a key derived from its file name.");
@@ -121,6 +121,7 @@ namespace CriPakTools
             string cpkPath = "";
             string outputCpk = "";
             string target = "";
+            bool force = false;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -131,6 +132,10 @@ namespace CriPakTools
                 else if (args[i] == "-o" && i + 1 < args.Length)
                 {
                     outputCpk = args[++i];
+                }
+                else if (args[i] == "-force")
+                {
+                    force = true;
                 }
                 else if (args[i] == "-to" && i + 1 < args.Length)
                 {
@@ -152,8 +157,13 @@ namespace CriPakTools
             }
 
             Console.WriteLine($"Convert: {cpkPath} => {outputCpk} ({(target == "ffbejp" ? "regular -> FFBE JP" : "FFBE JP -> regular")})");
+            if (!force)
+            {
+                CpkFormat format = FfbeJpConverter.Detect(cpkPath);
+                Console.WriteLine($"Detected format: {(format == CpkFormat.FfbeJp ? "FFBE JP" : format == CpkFormat.Regular ? "regular" : "unknown")}");
+            }
             int count = FfbeJpConverter.Convert(cpkPath, outputCpk, target == "ffbejp",
-                (float value) => Console.Write($"\rProgress: {value:F1}%"));
+                (float value) => Console.Write($"\rProgress: {value:F1}%"), force);
             Console.WriteLine($"\rConverted {count} files. Done!");
         }
 

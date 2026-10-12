@@ -60,6 +60,22 @@ namespace LibCPK
             return result;
         }
 
+        /// <summary>
+        /// Decrypts the first bytes of a file without needing the whole file: byte i of the result only depends on
+        /// the byte at (size / 2 + size % 2 + i) of the stored data.
+        /// </summary>
+        /// <param name="middle">stored bytes starting at offset size / 2 + size % 2</param>
+        public static byte[] DecryptPrefix(byte[] middle, string fileName)
+        {
+            uint hash = KeyHash(fileName);
+            byte[] result = new byte[middle.Length];
+            for (int i = 0; i < middle.Length; i++)
+            {
+                result[i] = (byte)(KeyByte(hash, i) ^ middle[i]);
+            }
+            return result;
+        }
+
         public static byte[] Encrypt(byte[] data, string fileName)
         {
             if (!AppliesTo(fileName))

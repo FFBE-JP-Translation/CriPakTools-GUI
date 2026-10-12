@@ -606,6 +606,19 @@ public class Program
 						bool toFfbeJp = toArgs.IsMatchParam("FFBEJP");
 						try
 						{
+							if (cAnalyCmdArgs.GetMatchArgs("FORCE") == null)
+							{
+								int detected = FfbeJp.DetectFormat(text);
+								PrintLine(cmdinf, "Detected format    : " + ((detected == 1) ? "FFBE JP" : ((detected == 0) ? "regular" : "unknown")));
+								if (detected == (toFfbeJp ? 1 : 0))
+								{
+									ErrorExit(cmdinf, "The CPK is already in the " + (toFfbeJp ? "FFBE JP" : "regular") + " format, converting it again would corrupt it. Use -force to override.");
+								}
+								if (detected == -1)
+								{
+									ErrorExit(cmdinf, "Could not tell which format the CPK is in. Use -force to convert anyway.");
+								}
+							}
 							File.Copy(text, matchArgs.ParamString, overwrite: true);
 							PrintLine(cmdinf, "Converted " + FfbeJp.ProcessCpk(matchArgs.ParamString, toFfbeJp) + " file(s) to " + (toFfbeJp ? "FFBE JP" : "regular") + " format: " + matchArgs.ParamString);
 						}
@@ -1453,7 +1466,7 @@ public class Program
 			PrintLine(cmdinf, "  -exportcpkinfo=[CSV Fliename] : Export a CPK File information.");
 			PrintLine(cmdinf, "  -extract=[outdir]             : Extract content files.");
 			PrintLine(cmdinf, "  --ffbejp                      : FFBE JP format. Decrypt the extracted files.");
-			PrintLine(cmdinf, "  -convert=[out.cpk] -to=[ffbejp|regular] : Convert the CPK to the FFBE JP / regular format.");
+			PrintLine(cmdinf, "  -convert=[out.cpk] -to=[ffbejp|regular] [-force] : Convert the CPK to the FFBE JP / regular format (format is checked first).");
 			PrintLine(cmdinf, "");
 			PrintLine(cmdinf, "* Verify mode - Compare a built CPK and Local original files.");
 			PrintLine(cmdinf, "  usage: cpkmakec  <Input CSV File or Directory> <Input CPK File> -verify");
