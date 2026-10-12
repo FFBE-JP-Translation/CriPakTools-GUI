@@ -596,7 +596,25 @@ public class Program
 					{
 						SwapCpkFileMask(text);
 					}
-					if ((matchArgs = cAnalyCmdArgs.GetMatchArgs("EXTRACT")) != null)
+					if ((matchArgs = cAnalyCmdArgs.GetMatchArgs("CONVERT")) != null)
+					{
+						ArgsCmdInfo toArgs = cAnalyCmdArgs.GetMatchArgs("TO");
+						if (string.IsNullOrEmpty(matchArgs.ParamString) || toArgs == null || !(toArgs.IsMatchParam("FFBEJP") || toArgs.IsMatchParam("REGULAR")))
+						{
+							ErrorExit(cmdinf, "usage: cpkmakec <Input CPK File> -convert=<Output CPK File> -to=<ffbejp|regular>");
+						}
+						bool toFfbeJp = toArgs.IsMatchParam("FFBEJP");
+						try
+						{
+							File.Copy(text, matchArgs.ParamString, overwrite: true);
+							PrintLine(cmdinf, "Converted " + FfbeJp.ProcessCpk(matchArgs.ParamString, toFfbeJp) + " file(s) to " + (toFfbeJp ? "FFBE JP" : "regular") + " format: " + matchArgs.ParamString);
+						}
+						catch (Exception ex)
+						{
+							ErrorExit(cmdinf, ex.Message);
+						}
+					}
+					else if ((matchArgs = cAnalyCmdArgs.GetMatchArgs("EXTRACT")) != null)
 					{
 						string text2 = text.Substring(0, text.Length - Path.GetExtension(text).Length);
 						if (!string.IsNullOrEmpty(matchArgs.ParamString))
@@ -1435,6 +1453,7 @@ public class Program
 			PrintLine(cmdinf, "  -exportcpkinfo=[CSV Fliename] : Export a CPK File information.");
 			PrintLine(cmdinf, "  -extract=[outdir]             : Extract content files.");
 			PrintLine(cmdinf, "  --ffbejp                      : FFBE JP format. Decrypt the extracted files.");
+			PrintLine(cmdinf, "  -convert=[out.cpk] -to=[ffbejp|regular] : Convert the CPK to the FFBE JP / regular format.");
 			PrintLine(cmdinf, "");
 			PrintLine(cmdinf, "* Verify mode - Compare a built CPK and Local original files.");
 			PrintLine(cmdinf, "  usage: cpkmakec  <Input CSV File or Directory> <Input CPK File> -verify");

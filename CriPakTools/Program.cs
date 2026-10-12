@@ -14,6 +14,7 @@ namespace CriPakTools
             Console.WriteLine("Usage:");
             Console.WriteLine("  extract_all -p <cpk_file> -o <output_dir> [-ffbejp]   extract CPK all files to target output dir");
             Console.WriteLine("  replace -p <cpk_file> -i <patch_files_dir> -o <output_cpk> [-nc <optional: not compress>] [-nl <optional: nameless compress, ignore file suffix>] [-ffbejp]  replace patch files to CPK");
+            Console.WriteLine("  convert -p <cpk_file> -o <output_cpk> -to <ffbejp|regular>   convert a CPK between the regular and the FFBE JP format");
             Console.WriteLine("");
             Console.WriteLine("Options:");
             Console.WriteLine("  -ffbejp           FFBE JP CPK format: every file is encrypted with a key derived from its file name.");
@@ -24,6 +25,8 @@ namespace CriPakTools
             Console.WriteLine("  CriPakTools.exe replace -p original.cpk -i modified_files -o modified.cpk [-nc]");
             Console.WriteLine("  CriPakTools.exe extract_all -p gallery1.cpk -o extracted_files -ffbejp");
             Console.WriteLine("  CriPakTools.exe replace -p gallery1.cpk -i modified_files -o modified.cpk -ffbejp");
+            Console.WriteLine("  CriPakTools.exe convert -p gallery1.cpk -o gallery1_regular.cpk -to regular");
+            Console.WriteLine("  CriPakTools.exe convert -p regular.cpk -o gallery1.cpk -to ffbejp");
         }
 
         static CPK cpkContent = new CPK();
@@ -48,6 +51,9 @@ namespace CriPakTools
                         break;
                     case "replace":
                         ReplaceCommand(args);
+                        break;
+                    case "convert":
+                        ConvertCommand(args);
                         break;
                     default:
                         Console.WriteLine($"Unsupported: {command}");
@@ -108,6 +114,47 @@ namespace CriPakTools
             ExtractAll(cpkPath, outputDir, ffbeJp);
 
             Console.WriteLine("\rExtract finished!");
+        }
+
+        static void ConvertCommand(string[] args)
+        {
+            string cpkPath = "";
+            string outputCpk = "";
+            string target = "";
+
+            for (int i = 1; i < args.Length; i++)
+            {
+                if (args[i] == "-p" && i + 1 < args.Length)
+                {
+                    cpkPath = args[++i];
+                }
+                else if (args[i] == "-o" && i + 1 < args.Length)
+                {
+                    outputCpk = args[++i];
+                }
+                else if (args[i] == "-to" && i + 1 < args.Length)
+                {
+                    target = args[++i].ToLower();
+                }
+            }
+
+            if (string.IsNullOrEmpty(cpkPath) || string.IsNullOrEmpty(outputCpk) || (target != "ffbejp" && target != "regular"))
+            {
+                Console.WriteLine("Error: miss args (convert needs -p, -o and -to ffbejp|regular)");
+                PrintUsage();
+                return;
+            }
+
+            if (!File.Exists(cpkPath))
+            {
+                Console.WriteLine($"Error: CPK file not exist => {cpkPath}");
+                return;
+            }
+
+            Console.WriteLine($"Convert: {cpkPath} => {outputCpk} ({(target == "ffbejp" ? "regular -> FFBE JP" : "FFBE JP -> regular")})");
+            int count = FfbeJpConverter.Convert(cpkPath, outputCpk, target == "ffbejp",
+                (float value) => Console.Write($"\rProgress: {value:F1}%"));
+            Console.WriteLine($"\rConverted {count} files. Done!");
         }
 
         static bool IsFfbeJpFlag(string arg)
