@@ -7,8 +7,10 @@ namespace cpkmakecCs;
 
 /// <summary>
 /// FFBE JP CPK format: every file stored in the CPK is encrypted with a key derived from its own file name.
-/// Packing encrypts the local files (into temporary copies) before they are handed to CpkMaker,
-/// extracting decrypts the extracted files afterwards.
+/// The data of a file is first compressed (CRILAYLA, optional) and then encrypted, so the encryption is applied to the
+/// finished CPK: packing builds the CPK normally and then encrypts every stored file in place, extracting decrypts a
+/// temporary copy of the CPK and lets the normal extraction (with its decompression) work on that.
+/// Encryption does not change any size, so the CPK tables stay valid.
 ///
 ///   hash  : h = 0; for each byte c of the ASCII file name: h = h * 31 + c   (uint32)
 ///   ks(i) : ((h >> (8 * (i & 3))) & 0xFF) + (i % 255)                    (byte)
@@ -18,8 +20,6 @@ namespace cpkmakecCs;
 /// </summary>
 public static class FfbeJp
 {
-	private static string tempDir;
-
 	/// <summary>Files whose name contains this text are stored as they are.</summary>
 	private const string UnencryptedMarker = "unit_unit1";
 
@@ -93,69 +93,244 @@ public static class FfbeJp
 		return result;
 	}
 
-	/// <summary>
-	/// Writes an encrypted copy of a local file into a temporary directory and returns its path.
-	/// The time stamp of the source file is kept.
-	/// </summary>
-	public static string EncryptToTemp(string localPath, string contentName, uint index)
+	private class Entry
 	{
-		if (tempDir == null)
-		{
-			tempDir = Path.Combine(Path.GetTempPath(), "cpkmakec_ffbejp_" + Guid.NewGuid().ToString("N"));
-			Directory.CreateDirectory(tempDir);
-			AppDomain.CurrentDomain.ProcessExit += delegate
-			{
-				Cleanup();
-			};
-		}
-		string dir = Path.Combine(tempDir, index.ToString());
-		Directory.CreateDirectory(dir);
-		string dest = Path.Combine(dir, KeyName(localPath));
-		File.WriteAllBytes(dest, Encrypt(File.ReadAllBytes(localPath), KeyName(contentName)));
-		File.SetLastWriteTime(dest, File.GetLastWriteTime(localPath));
-		return dest;
+		public string Name;
+		public long Offset;
+		public int Size;
 	}
 
-	/// <summary>Decrypts every file below the directory in place. Returns the number of files.</summary>
-	public static int DecryptDirectory(string dir)
+	private static uint ReadU32(byte[] b, int p)
+	{
+		return (uint)((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]);
+	}
+
+	private static ushort ReadU16(byte[] b, int p)
+	{
+		return (ushort)((b[p] << 8) | b[p + 1]);
+	}
+
+	private static ulong ReadU64(byte[] b, int p)
+	{
+		return ((ulong)ReadU32(b, p) << 32) | ReadU32(b, p + 4);
+	}
+
+	/// <summary>Reads a packet ("CPK ", "TOC ", ...) and returns its (unmasked) utf table.</summary>
+	private static byte[] ReadPacket(FileStream fs, long offset, string id)
+	{
+		byte[] head = new byte[16];
+		fs.Seek(offset, SeekOrigin.Begin);
+		if (fs.Read(head, 0, 16) != 16 || Encoding.ASCII.GetString(head, 0, 4) != id)
+		{
+			throw new InvalidDataException("'" + id.Trim() + "' packet not found at " + offset);
+		}
+		long size = (long)BitConverter.ToUInt64(head, 8);
+		byte[] utf = new byte[size];
+		int read = 0;
+		while (read < utf.Length)
+		{
+			int n = fs.Read(utf, read, utf.Length - read);
+			if (n <= 0)
+			{
+				throw new EndOfStreamException();
+			}
+			read += n;
+		}
+		if (!(utf[0] == 0x40 && utf[1] == 0x55 && utf[2] == 0x54 && utf[3] == 0x46))
+		{
+			// masked table
+			int x = 25951;
+			for (int i = 0; i < utf.Length; i++)
+			{
+				utf[i] = (byte)(utf[i] ^ (x & 0xFF));
+				x = unchecked(x * 16661);
+			}
+		}
+		return utf;
+	}
+
+	/// <summary>Minimal @UTF table reader: returns the rows as column name -> value (string or ulong).</summary>
+	private static List<Dictionary<string, object>> ReadUtf(byte[] u)
+	{
+		int baseOff = 8;
+		int rowOff = ReadU16(u, 10);
+		uint strOff = ReadU32(u, 12);
+		int columns = ReadU16(u, 24);
+		int rowSize = ReadU16(u, 26);
+		uint rows = ReadU32(u, 28);
+
+		Func<uint, string> str = delegate(uint o)
+		{
+			int a = (int)(baseOff + strOff + o);
+			int e = a;
+			while (u[e] != 0)
+			{
+				e++;
+			}
+			return Encoding.UTF8.GetString(u, a, e - a);
+		};
+
+		int p = 32;
+		string[] names = new string[columns];
+		int[] flags = new int[columns];
+		object[] constants = new object[columns];
+		for (int i = 0; i < columns; i++)
+		{
+			flags[i] = u[p++];
+			names[i] = str(ReadU32(u, p));
+			p += 4;
+			if ((flags[i] & 0xF0) == 0x30)
+			{
+				int len;
+				constants[i] = ReadValue(u, p, flags[i] & 0x0F, str, out len);
+				p += len;
+			}
+		}
+
+		List<Dictionary<string, object>> result = new List<Dictionary<string, object>>();
+		for (uint r = 0; r < rows; r++)
+		{
+			int q = baseOff + rowOff + (int)r * rowSize;
+			Dictionary<string, object> row = new Dictionary<string, object>();
+			for (int i = 0; i < columns; i++)
+			{
+				int storage = flags[i] & 0xF0;
+				if (storage == 0x30)
+				{
+					row[names[i]] = constants[i];
+				}
+				else if (storage == 0x50)
+				{
+					int len;
+					row[names[i]] = ReadValue(u, q, flags[i] & 0x0F, str, out len);
+					q += len;
+				}
+			}
+			result.Add(row);
+		}
+		return result;
+	}
+
+	private static object ReadValue(byte[] u, int p, int type, Func<uint, string> str, out int len)
+	{
+		switch (type)
+		{
+		case 0:
+		case 1:
+			len = 1;
+			return (ulong)u[p];
+		case 2:
+		case 3:
+			len = 2;
+			return (ulong)ReadU16(u, p);
+		case 4:
+		case 5:
+		case 8:
+			len = 4;
+			return (ulong)ReadU32(u, p);
+		case 6:
+		case 7:
+		case 9:
+			len = 8;
+			return ReadU64(u, p);
+		case 10:
+			len = 4;
+			return str(ReadU32(u, p));
+		default:
+			len = 8;
+			return null;
+		}
+	}
+
+	private static List<Entry> ReadEntries(FileStream fs)
+	{
+		byte[] header = ReadPacket(fs, 0, "CPK ");
+		Dictionary<string, object> cpk = ReadUtf(header)[0];
+		if (!cpk.ContainsKey("TocOffset") || cpk["TocOffset"] == null)
+		{
+			throw new InvalidDataException("This CPK has no file names (ID only mode), the file name key cannot be derived.");
+		}
+		long toc = (long)(ulong)cpk["TocOffset"];
+		long content = cpk.ContainsKey("ContentOffset") && cpk["ContentOffset"] != null ? (long)(ulong)cpk["ContentOffset"] : toc;
+		long add = toc > 0x800 ? 0x800 : toc;
+		if (content < add)
+		{
+			add = content;
+		}
+
+		List<Entry> entries = new List<Entry>();
+		foreach (Dictionary<string, object> row in ReadUtf(ReadPacket(fs, toc, "TOC ")))
+		{
+			if (!row.ContainsKey("FileName") || row["FileName"] == null)
+			{
+				throw new InvalidDataException("This CPK has no file names (ID only mode), the file name key cannot be derived.");
+			}
+			Entry e = new Entry();
+			e.Name = (string)row["FileName"];
+			e.Offset = add + (long)(ulong)row["FileOffset"];
+			e.Size = (int)(ulong)row["FileSize"];
+			entries.Add(e);
+		}
+		return entries;
+	}
+
+	/// <summary>
+	/// Encrypts (or decrypts) the stored data of every file of the CPK in place.
+	/// Returns the number of files that were processed.
+	/// </summary>
+	public static int ProcessCpk(string cpkPath, bool encrypt)
 	{
 		int count = 0;
-		if (!Directory.Exists(dir))
+		using (FileStream fs = new FileStream(cpkPath, FileMode.Open, FileAccess.ReadWrite))
 		{
-			return 0;
-		}
-		foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
-		{
-			string name = KeyName(file);
-			if (!AppliesTo(name))
+			foreach (Entry e in ReadEntries(fs))
 			{
-				continue;
+				string key = KeyName(e.Name);
+				if (!AppliesTo(key) || e.Size == 0)
+				{
+					continue;
+				}
+				byte[] data = new byte[e.Size];
+				fs.Seek(e.Offset, SeekOrigin.Begin);
+				int read = 0;
+				while (read < data.Length)
+				{
+					int n = fs.Read(data, read, data.Length - read);
+					if (n <= 0)
+					{
+						throw new EndOfStreamException("Unexpected end of CPK in " + e.Name);
+					}
+					read += n;
+				}
+				data = encrypt ? Encrypt(data, key) : Decrypt(data, key);
+				fs.Seek(e.Offset, SeekOrigin.Begin);
+				fs.Write(data, 0, data.Length);
+				count++;
 			}
-			byte[] data = Decrypt(File.ReadAllBytes(file), name);
-			if (data.Length >= 8 && Encoding.ASCII.GetString(data, 0, 8) == "CRILAYLA")
-			{
-				Console.WriteLine("Warning: " + name + " is CRILAYLA compressed, it is decrypted but still compressed.");
-			}
-			DateTime time = File.GetLastWriteTime(file);
-			File.WriteAllBytes(file, data);
-			File.SetLastWriteTime(file, time);
-			count++;
 		}
 		return count;
 	}
 
-	public static void Cleanup()
+	/// <summary>Creates a temporary copy of the CPK; it is deleted when the program ends.</summary>
+	public static string CreateTempCopy(string cpkPath)
 	{
-		if (tempDir != null)
+		string temp = Path.Combine(Path.GetTempPath(), "cpkmakec_ffbejp_" + Guid.NewGuid().ToString("N") + ".cpk");
+		File.Copy(cpkPath, temp, overwrite: true);
+		AppDomain.CurrentDomain.ProcessExit += delegate
 		{
-			try
-			{
-				Directory.Delete(tempDir, recursive: true);
-			}
-			catch (Exception)
-			{
-			}
-			tempDir = null;
+			DeleteTemp(temp);
+		};
+		return temp;
+	}
+
+	public static void DeleteTemp(string path)
+	{
+		try
+		{
+			File.Delete(path);
+		}
+		catch (Exception)
+		{
 		}
 	}
 }

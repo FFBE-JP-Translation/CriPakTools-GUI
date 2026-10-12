@@ -60,20 +60,13 @@ namespace LibCPK
         }
 
         /// <summary>
-        /// The header totals follow the size of the stored files. EnabledPackedSize/EnabledDataSize are
-        /// a multiple of the per file sum in archives made by the official tool, keep that factor.
+        /// Totals of the CPK header as the official tool writes them (the TOC and the ITOC both list every file):
+        /// EnabledPackedSize = 2 * sum(ExtractSize), EnabledDataSize = sum(FileSize) + sum(ExtractSize).
         /// </summary>
-        private void UpdateHeaderTotal(string column, long oldSum, long newSum)
+        private void UpdateHeaderTotals(long storedSum, long extractSum)
         {
-            object current;
-            if (cpk.cpkdata == null || !cpk.cpkdata.TryGetValue(column, out current) || current == null || oldSum <= 0)
-            {
-                return;
-            }
-
-            long oldTotal = Convert.ToInt64(current);
-            long factor = (oldTotal % oldSum == 0 && oldTotal / oldSum > 0) ? oldTotal / oldSum : 1;
-            cpk.UpdateHeaderValue(column, newSum * factor);
+            cpk.UpdateHeaderValue("EnabledPackedSize", 2 * extractSum);
+            cpk.UpdateHeaderValue("EnabledDataSize", storedSum + extractSum);
         }
         public PatchCPK(CPK pCpk, string oldContentName)
         {
@@ -146,7 +139,7 @@ namespace LibCPK
             cpk.FfbeJpFormat = FfbeJpFormat;
             int align = GetAlign();
             long contentEnd = 0;
-            long oldPackedSum = 0, oldDataSum = 0, newPackedSum = 0, newDataSum = 0;
+            long newPackedSum = 0, newDataSum = 0;
 
             List<FileEntry> entries = cpk.fileTable.OrderBy(x => x.FileOffset).ToList();
 
@@ -204,9 +197,7 @@ namespace LibCPK
 
                             byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries[i].FileSize.ToString()));
                             newCPK.Write(chunk);
-                            oldPackedSum += chunk.Length;
                             newPackedSum += chunk.Length;
-                            oldDataSum += Convert.ToInt64(entries[i].ExtractSize ?? entries[i].FileSize);
                             newDataSum += Convert.ToInt64(entries[i].ExtractSize ?? entries[i].FileSize);
 
                             contentEnd = newCPK.BaseStream.Position;
@@ -248,8 +239,6 @@ namespace LibCPK
                                 stored = AssetCipher.Encrypt(stored, entries[i].FileName.ToString());
                             }
 
-                            oldPackedSum += o_com_size;
-                            oldDataSum += o_ext_size;
                             newPackedSum += stored.Length;
                             newDataSum += newbie.Length;
 
@@ -328,8 +317,7 @@ namespace LibCPK
             {
                 cpk.UpdateHeaderValue("ContentSize", AlignUp(contentEnd - (long)cpk.ContentOffset, align));
             }
-            UpdateHeaderTotal("EnabledPackedSize", oldPackedSum, newPackedSum);
-            UpdateHeaderTotal("EnabledDataSize", oldDataSum, newDataSum);
+            UpdateHeaderTotals(newPackedSum, newDataSum);
 
             cpk.WriteCPK(newCPK);
             msg = string.Format("Writing TOC....");

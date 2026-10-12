@@ -44,7 +44,7 @@ cpkmakec <in.cpk> -extract=<outdir> --ffbejp                      (extract, file
 
 The official `CpkMaker.dll` is not in the repo: copy the official tool files into `tools/cpkmakec/official_tool` (or `tools/official_tool`), or pass `-p:CpkMakerDir=<folder>` / set `CPKMAKER_DIR`. Then build with `dotnet build -c Release` in `tools/cpkmakec` and copy
 `bin/Release/net40/cpkmakec.exe` over the official one (CpkMaker.dll and CpkBinder.dll stay next to it).
-The FFBE JP code is in `tools/cpkmakec/cpkmakecCs/FfbeJp.cs`. Use a mode that stores file names, compression is not supported.
+The FFBE JP code is in `tools/cpkmakec/cpkmakecCs/FfbeJp.cs`. Use a mode that stores file names; compression works (the CPK is built normally and then encrypted in place), `-crc` can not be combined with it.
 
 Compiling
 =========

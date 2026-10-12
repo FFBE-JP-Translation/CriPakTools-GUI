@@ -193,6 +193,17 @@ public class Program
 	public static int MakeByCsvFile(CommandInfo cmdinf)
 	{
 		int result = 0;
+		if (cmdinf.FfbeJp)
+		{
+			if (cmdinf.Mode == CommandInfo.EnumDataMode.ModeId)
+			{
+				ErrorExit(cmdinf, "--ffbejp needs a mode that stores file names (-mode=FILENAME, FILENAMEID, ...).");
+			}
+			if (cmdinf.CRC)
+			{
+				ErrorExit(cmdinf, "--ffbejp cannot be used with -crc (the CRC would not match the encrypted data).");
+			}
+		}
 		using (CpkMaker maker = MakeByCsvFileSubInitialize(cmdinf))
 		{
 			List<CMkFileInfo> list = MakeByCsvFileSubAanlyCsvAndSortFinf(cmdinf, maker);
@@ -202,7 +213,17 @@ public class Program
 			}
 			result = (cmdinf.Verify ? Verify(cmdinf, list) : MakeByCsvFileSubBuild(cmdinf, maker, list));
 		}
-		FfbeJp.Cleanup();
+		if (cmdinf.FfbeJp && result == 0 && !cmdinf.Verify)
+		{
+			try
+			{
+				PrintLine(cmdinf, "FFBE JP format      : encrypting " + FfbeJp.ProcessCpk(cmdinf.CpkFilename, encrypt: true) + " file(s)");
+			}
+			catch (Exception ex)
+			{
+				ErrorExit(cmdinf, ex.Message);
+			}
+		}
 		return result;
 	}
 
@@ -440,24 +461,8 @@ public class Program
 					break;
 				}
 			}
-			if (cmdinf.FfbeJp)
-			{
-				if (cmdinf.ForceCompress)
-				{
-					ErrorExit(cmdinf, "--ffbejp cannot be used with -forcecompress (encrypted data does not compress).");
-				}
-				PrintLine(cmdinf, "FFBE JP format      : encrypting " + list.Count.ToString("N0") + " file(s)");
-			}
 			foreach (CMkFileInfo item in list)
 			{
-				if (cmdinf.FfbeJp)
-				{
-					if (item.Compress)
-					{
-						ErrorExit(cmdinf, "Line." + item.Lines + " compressed files cannot be used with --ffbejp.");
-					}
-					item.LocalFilePath = FfbeJp.EncryptToTemp(item.LocalFilePath, string.IsNullOrEmpty(item.ContentFilePath) ? item.LocalFilePath : item.ContentFilePath, item.RegisterIndex);
-				}
 				int regId = (cmdinf.DefineHeaderCsvDefOrder ? ((int)item.Lines) : (-1));
 				if (IsEnableGroup(cmdinf.Mode))
 				{
@@ -600,15 +605,25 @@ public class Program
 						}
 						PrintLine(cmdinf, "Output Directory : " + text2);
 						Printf(cmdinf, "Extracting ...  ");
+						string cpkToExtract = text;
+						if (cmdinf.FfbeJp)
+						{
+							// decrypt a copy of the CPK, the normal extraction (incl. decompression) then works on it
+							try
+							{
+								cpkToExtract = FfbeJp.CreateTempCopy(text);
+								PrintLine(cmdinf, "Decrypting (FFBE JP) ... " + FfbeJp.ProcessCpk(cpkToExtract, encrypt: false) + " file(s)");
+							}
+							catch (Exception ex)
+							{
+								ErrorExit(cmdinf, ex.Message);
+							}
+						}
 						using CpkMaker cpkMaker = new CpkMaker();
-						cpkMaker.AnalyzeCpkFile(text);
+						cpkMaker.AnalyzeCpkFile(cpkToExtract);
 						cpkMaker.StartToExtract(text2);
 						if (cpkMaker.WaitForComplete())
 						{
-							if (cmdinf.FfbeJp)
-							{
-								PrintLine(cmdinf, "Decrypting (FFBE JP) ... " + FfbeJp.DecryptDirectory(text2) + " file(s)");
-							}
 							PrintLine(cmdinf, "Complete.");
 						}
 						else
@@ -1409,7 +1424,7 @@ public class Program
 				PrintLine(cmdinf, "  -relc_romtype=[0|1]       : 1:NAND32, 0:Other.              default:1");
 				PrintLine(cmdinf, "  -outcpkh                  : Output .cpkh file(Header part of .cpk file). ");
 			PrintLine(cmdinf, "  --ffbejp                  : FFBE JP format. Encrypt each file with a key derived from its filename.");
-			PrintLine(cmdinf, "                              Use a mode that stores file names (not ID). No compression.");
+			PrintLine(cmdinf, "                              Use a mode that stores file names (not ID). Not usable with -crc.");
 			}
 			PrintLine(cmdinf, "");
 			PrintLine(cmdinf, "  (*) Cannot Additional build");

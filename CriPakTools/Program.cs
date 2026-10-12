@@ -447,7 +447,7 @@ namespace CriPakTools
                     Console.WriteLine("CPK Patched.");
                 }
             );
-            patcher.Patch(outputCpk, uncompressed, fileMap);
+            patcher.Patch(outputCpk, !uncompressed, fileMap);
         }
 
         static List<string> GetAllFiles(string directory)
