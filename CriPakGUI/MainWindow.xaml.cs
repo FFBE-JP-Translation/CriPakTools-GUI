@@ -61,6 +61,20 @@ namespace CriPakGUI
                         datagrid_cpk.ItemsSource = cpk.table;
                         menu_importAssets.IsEnabled = true;
                         menu_savefiles.IsEnabled = true;
+
+                        // switch the FFBE JP option on when the CPK is in that format
+                        try
+                        {
+                            if (FfbeJpConverter.Detect(fName) == CpkFormat.FfbeJp)
+                            {
+                                menu_ffbejp.IsChecked = true;
+                                menu_ffbejp_Click(menu_ffbejp, null);
+                                status_cpkmsg.Content += " (FFBE JP format detected)";
+                            }
+                        }
+                        catch (Exception)
+                        {
+                        }
                     }
                     else
                     {
@@ -87,6 +101,15 @@ namespace CriPakGUI
             });
         }
 
+
+        private void menu_ffbejp_Click(object sender, RoutedEventArgs e)
+        {
+            MainApp.Instance.currentPackage.FfbeJpFormat = menu_ffbejp.IsChecked;
+            if (MainApp.Instance.currentPackage.CpkContent != null)
+            {
+                MainApp.Instance.currentPackage.CpkContent.FfbeJpFormat = menu_ffbejp.IsChecked;
+            }
+        }
 
         private void menu_importAssets_Click(object sender, RoutedEventArgs e)
         {
@@ -187,10 +210,14 @@ namespace CriPakGUI
 
                     oldFile.BaseStream.Seek((long)entries[i].FileOffset, SeekOrigin.Begin);
 
-                    string isComp = Encoding.ASCII.GetString(oldFile.ReadBytes(8));
-                    oldFile.BaseStream.Seek((long)entries[i].FileOffset, SeekOrigin.Begin);
-
                     byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries[i].FileSize.ToString()));
+
+                    if (MainApp.Instance.currentPackage.FfbeJpFormat)
+                    {
+                        chunk = AssetCipher.Decrypt(chunk, entries[i].FileName.ToString());
+                    }
+
+                    string isComp = Encoding.ASCII.GetString(chunk, 0, Math.Min(8, chunk.Length));
 
                     if (isComp == "CRILAYLA")
                     {
@@ -301,10 +328,14 @@ namespace CriPakGUI
             BinaryReader oldFile = new BinaryReader(File.OpenRead(MainApp.Instance.currentPackage.CpkContentName));
             oldFile.BaseStream.Seek((long)entries.FileOffset, SeekOrigin.Begin);
 
-            string isComp = Encoding.ASCII.GetString(oldFile.ReadBytes(8));
-            oldFile.BaseStream.Seek((long)entries.FileOffset, SeekOrigin.Begin);
-
             byte[] chunk = oldFile.ReadBytes(Int32.Parse(entries.FileSize.ToString()));
+
+            if (MainApp.Instance.currentPackage.FfbeJpFormat)
+            {
+                chunk = AssetCipher.Decrypt(chunk, entries.LocalName);
+            }
+
+            string isComp = Encoding.ASCII.GetString(chunk, 0, Math.Min(8, chunk.Length));
 
             if (isComp == "CRILAYLA")
             {

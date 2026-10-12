@@ -305,7 +305,8 @@ namespace LibCPK
                 }
                  
                 cpk.Write(Encoding.ASCII.GetBytes(ID));
-                cpk.Write((Int32)0xff);
+                // The CRI tools store 0 here when the utf table is masked and 0xff when it is plain.
+                cpk.Write(isUtfEncrypted ? 0 : (Int32)0xff);
                 cpk.Write((UInt64)encrypted.Length);
                 cpk.Write(encrypted);
             }
@@ -1040,6 +1041,25 @@ namespace LibCPK
             }
         }
 
+        /// <summary>
+        /// Updates a numeric column of the CPK header (first row) in CPK_packet.
+        /// Returns false when the column does not exist or can not be patched in place.
+        /// </summary>
+        public bool UpdateHeaderValue(string columnName, object value)
+        {
+            long pos = GetColumnPostion(utf, 0, columnName);
+            Type type = GetColumnType(utf, 0, columnName);
+            if (pos <= 0 || type == null)
+            {
+                return false;
+            }
+
+            byte[] packet = CPK_packet;
+            UpdateValue(ref packet, value, pos, type);
+            CPK_packet = packet;
+            return true;
+        }
+
         public void UpdateValue(ref byte[] packet, object value, long pos, Type type)
         {
             MemoryStream temp = new MemoryStream();
@@ -1084,6 +1104,12 @@ namespace LibCPK
 
         public bool isUtfEncrypted { get; set; }
         public bool isNamelessPack { get; set; }
+
+        /// <summary>
+        /// The archive uses the FFBE JP format: every file is encrypted with a key derived
+        /// from its name (see <see cref="AssetCipher"/>).
+        /// </summary>
+        public bool FfbeJpFormat { get; set; }
         public int unk1 { get; set; }
         public long utf_size { get; set; }
         public byte[] utf_packet { get; set; }

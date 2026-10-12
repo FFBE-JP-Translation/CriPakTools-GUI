@@ -19,6 +19,45 @@ I forked and added more features in the *NEW* GUI Version.
 Tool to extract/update contents of CRIWARE's CPK archive format. (aka CRI FileMajik)  
 This is based on codes uploaded by Falo's code released on the Xentax forums (http://forum.xentax.com/viewtopic.php?f=10&t=10646) which was futher modified by Nanashi3 (http://forums.fuwanovel.org/index.php?/topic/1785-request-for-psp-hackers/page-4),and esperknight (https://github.com/esperknight/CriPakTools).  
 
+FFBE JP CPK format (per-file encryption)
+========================================
+The Japanese version of FFBE stores every file in its CPKs encrypted with a key derived from the file's own name
+(see `LibCPK/AssetCipher.cs` for the algorithm). Use the *FFBE JP format* option to handle these archives:
+
+* CLI: add `-jp` / `-ffbejp` to `extract_all` (decrypts the files) and to `replace` (encrypts the patch files).
+* GUI: tick `Options > FFBE JP format (per-file encryption)` before extracting, or the checkbox in the *Patch CPK* window.
+
+```
+CriPakTools.exe extract_all -p gallery1.cpk -o extracted -ffbejp
+CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk -ffbejp
+```
+
+Convert a CPK between the formats (only the per-file encryption changes, the CPK structure is kept):
+
+```
+CriPakTools.exe convert -p gallery1.cpk -o gallery1_regular.cpk -to regular
+CriPakTools.exe convert -p gallery1_regular.cpk -o gallery1.cpk -to ffbejp
+cpkmakec gallery1.cpk -convert=gallery1_regular.cpk -to=regular
+```
+
+Extracting also detects the format by itself: an FFBE JP CPK is recognised and decrypted even without `-ffbejp` / `--ffbejp` (the GUI switches the option on when it opens such a CPK). The flag is still needed for packing.
+
+Before converting, the current format is detected (from the file signatures of the stored files) and the conversion is refused if the CPK is already in the target format or the format can not be told. Add `-force` to skip the check.
+
+Official CRI tool (cpkmakec.exe)
+--------------------------------
+`tools/cpkmakec` is the decompiled source of the official command line CPK builder (cpkmakec.exe 2.49.32) with
+`--ffbejp` built into the code:
+
+```
+cpkmakec <dir or csv> <out.cpk> -mode=FILENAMEID ... --ffbejp     (pack, files are encrypted by name)
+cpkmakec <in.cpk> -extract=<outdir> --ffbejp                      (extract, files are decrypted afterwards)
+```
+
+The official `CpkMaker.dll` is not in the repo: copy the official tool files into `tools/cpkmakec/official_tool` (or `tools/official_tool`), or pass `-p:CpkMakerDir=<folder>` / set `CPKMAKER_DIR`. Then build with `dotnet build -c Release` in `tools/cpkmakec` and copy
+`bin/Release/net40/cpkmakec.exe` over the official one (CpkMaker.dll and CpkBinder.dll stay next to it).
+The FFBE JP code is in `tools/cpkmakec/cpkmakecCs/FfbeJp.cs`. Use a mode that stores file names; compression works (the CPK is built normally and then encrypted in place), `-crc` can not be combined with it.
+
 Compiling
 =========
 Install Visual Stuidio 2019 & Visual C++ V142.
