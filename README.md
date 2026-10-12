@@ -40,6 +40,8 @@ CriPakTools.exe convert -p gallery1_regular.cpk -o gallery1.cpk -to ffbejp
 cpkmakec gallery1.cpk -convert=gallery1_regular.cpk -to=regular
 ```
 
+Extracting also detects the format by itself: an FFBE JP CPK is recognised and decrypted even without `-ffbejp` / `--ffbejp` (the GUI switches the option on when it opens such a CPK). The flag is still needed for packing.
+
 Before converting, the current format is detected (from the file signatures of the stored files) and the conversion is refused if the CPK is already in the target format or the format can not be told. Add `-force` to skip the check.
 
 Official CRI tool (cpkmakec.exe)

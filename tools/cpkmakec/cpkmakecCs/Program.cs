@@ -637,6 +637,21 @@ public class Program
 						PrintLine(cmdinf, "Output Directory : " + text2);
 						Printf(cmdinf, "Extracting ...  ");
 						string cpkToExtract = text;
+						if (!cmdinf.FfbeJp)
+						{
+							// the official extraction crashes on encrypted data, so recognise the format by itself
+							try
+							{
+								if (FfbeJp.DetectFormat(text) == 1)
+								{
+									cmdinf.FfbeJp = true;
+									PrintLine(cmdinf, "Detected FFBE JP format, using --ffbejp.");
+								}
+							}
+							catch (Exception)
+							{
+							}
+						}
 						if (cmdinf.FfbeJp)
 						{
 							// decrypt a copy of the CPK, the normal extraction (incl. decompression) then works on it

@@ -61,6 +61,20 @@ namespace CriPakGUI
                         datagrid_cpk.ItemsSource = cpk.table;
                         menu_importAssets.IsEnabled = true;
                         menu_savefiles.IsEnabled = true;
+
+                        // switch the FFBE JP option on when the CPK is in that format
+                        try
+                        {
+                            if (FfbeJpConverter.Detect(fName) == CpkFormat.FfbeJp)
+                            {
+                                menu_ffbejp.IsChecked = true;
+                                menu_ffbejp_Click(menu_ffbejp, null);
+                                status_cpkmsg.Content += " (FFBE JP format detected)";
+                            }
+                        }
+                        catch (Exception)
+                        {
+                        }
                     }
                     else
                     {

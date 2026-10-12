@@ -259,6 +259,20 @@ namespace CriPakTools
             }
 
             cpkContentName = cpkPath;
+            if (!ffbeJp)
+            {
+                try
+                {
+                    if (FfbeJpConverter.Detect(cpkPath) == CpkFormat.FfbeJp)
+                    {
+                        ffbeJp = true;
+                        Console.WriteLine("Detected FFBE JP format, using -ffbejp.");
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
             cpkContent.FfbeJpFormat = ffbeJp;
             cpkContent.ReadCPK(cpkPath, Encoding.UTF8);
 
