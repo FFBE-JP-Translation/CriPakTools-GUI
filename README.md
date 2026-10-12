@@ -32,6 +32,14 @@ CriPakTools.exe extract_all -p gallery1.cpk -o extracted -ffbejp
 CriPakTools.exe replace -p gallery1.cpk -i extracted -o rebuilt.cpk -ffbejp
 ```
 
+Convert a CPK between the formats (only the per-file encryption changes, the CPK structure is kept):
+
+```
+CriPakTools.exe convert -p gallery1.cpk -o gallery1_regular.cpk -to regular
+CriPakTools.exe convert -p gallery1_regular.cpk -o gallery1.cpk -to ffbejp
+cpkmakec gallery1.cpk -convert=gallery1_regular.cpk -to=regular
+```
+
 Official CRI tool (cpkmakec.exe)
 --------------------------------
 `tools/cpkmakec` is the decompiled source of the official command line CPK builder (cpkmakec.exe 2.49.32) with
