@@ -62,6 +62,16 @@ public class Program
 				return true;
 			}
 			Console.WriteLine("===================== View Mode =====================");
+			string formatString = "unknown";
+			try
+			{
+				int detectedFormat = FfbeJp.DetectFormat(cpkFilename);
+				formatString = ((detectedFormat == 1) ? "FFBE JP (files are encrypted, use --ffbejp)" : ((detectedFormat == 0) ? "regular" : "unknown"));
+			}
+			catch (Exception)
+			{
+			}
+			Console.WriteLine("CPK Format           : " + formatString);
 			Console.Write("detecting...\r");
 			string cpkInformationString = cpkMaker.GetCpkInformationString();
 			if (!string.IsNullOrEmpty(cmdinf.ExportCsvFname))
